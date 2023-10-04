@@ -35,6 +35,23 @@ app.post('/register', (req,res) => {
         });
 })
 
+
+app.post('/login', (req,res) => {
+  var sql = "SELECT * FROM users WHERE `email` = ? AND `password` = ?";
+  //Execute the SQL statement, with the value array:
+  db.query(sql, [req.body.email,req.body.password], function (err, data) {
+    if (err){
+      return res.json("Error DB");
+    }
+    if (data.length > 0){
+      return res.json("Success")
+    } else {
+      return res.json("Fail")
+    }
+  });
+})
+
+
 app.listen(PORT, ()=>{
     console.log(`Server started running on port ${PORT}`)
 })
