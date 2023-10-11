@@ -7,9 +7,15 @@ const bcrypt = require("bcryptjs");
 const cookieParser = require("cookie-parser");
 const PORT = 5001;
 
+const JwtSecretKey = "d1e8a70b5ccab1dc2f56bbf7e99f064a660c08e361a35751b9c483c88943d082"
+
 const app = express();
 
-app.use(cors());
+app.use(cors({
+  origin:['http://localhost:3000'],
+  methods:["post","get"],
+  credentials: true
+}));
 app.use(express.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(cookieParser());
@@ -58,6 +64,9 @@ app.post("/login", (req, res) => {
           return res.json({Error:"Password not matching"})
         }
         if (resp){
+          const name = data[0].name;
+          const token = jwt.sign({name}, JwtSecretKey, {expiresIn:'1d'});
+          res.cookie('token',token);
           return res.json({status:"Success"});
         }
         else {
