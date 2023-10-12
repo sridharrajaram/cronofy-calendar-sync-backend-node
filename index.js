@@ -5,17 +5,19 @@ const mysql = require("mysql");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 const cookieParser = require("cookie-parser");
+require('dotenv').config();
 const PORT = 5001;
 
-const JwtSecretKey = "d1e8a70b5ccab1dc2f56bbf7e99f064a660c08e361a35751b9c483c88943d082"
+const JwtSecretKey = process.env.JWT_SECRET_KEY
 
 const app = express();
 
 app.use(cors({
-  origin:['http://localhost:3000'],
-  methods:["post","get"],
+  origin: ['http://localhost:3000'],
+  methods: ["POST", "GET"],
   credentials: true
 }));
+
 app.use(express.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(cookieParser());
@@ -27,6 +29,29 @@ const db = mysql.createConnection({
   password: "Mysql@123$",
   database: "calsync",
 });
+
+// Middleware - to verify the user authentication
+const verifyUser = (req,res,next) => {
+  const authCookie = req.cookies.authCookie
+  if (!authCookie) {
+    return res.json({ Error: "You are not authenticated" })
+  } else {
+    jwt.verify(authCookie, JwtSecretKey, (err, decoded) => {
+      if (err) {
+        return res.json({ Error: "Invalid Token" })
+      }
+      else if(decoded.name) {
+        req.name = decoded.name;
+        next()
+      }
+    })
+  }
+}
+
+app.get('/', verifyUser, (req,res) => {
+  return res.json({ status: "Success", name: req.name });
+})
+
 
 app.post("/register", (req, res) => {
   var sql = "INSERT INTO users (`name`, `email`, `password`) VALUES (?)";
@@ -52,29 +77,29 @@ app.post("/register", (req, res) => {
 
 app.post("/login", (req, res) => {
   var sql = "SELECT * FROM users WHERE email = ?";
-  db.query(sql,[req.body.email], (err,data)=>{
-    if(err){
+  db.query(sql, [req.body.email], (err, data) => {
+    if (err) {
       console.error(err)
-      return res.json({Error: "Error in DB connection"})
+      return res.json({ Error: "Error in DB connection" })
     }
-    if(data.length>0){
-      bcrypt.compare(req.body.password.toString(), data[0].password, (err, resp)=> {
-        if(err){
+    if (data.length > 0) {
+      bcrypt.compare(req.body.password.toString(), data[0].password, (err, resp) => {
+        if (err) {
           console.err(err)
-          return res.json({Error:"Password not matching"})
+          return res.json({ Error: "Password not matching" })
         }
-        if (resp){
+        if (resp) {
           const name = data[0].name;
-          const token = jwt.sign({name}, JwtSecretKey, {expiresIn:'1d'});
-          res.cookie('token',token);
-          return res.json({status:"Success"});
+          const token = jwt.sign({name}, JwtSecretKey, { expiresIn: '1d' });
+          res.cookie('authCookie',token);
+          return res.json({ status: "Success" });
         }
         else {
-          return res.json({status:"Error"});
+          return res.json({ status: "Error" });
         }
       })
     } else {
-      return res.json({Error: "Email not matching"})
+      return res.json({ Error: "Email not matching" })
     }
   })
 });
