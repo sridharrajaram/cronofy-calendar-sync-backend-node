@@ -5,6 +5,7 @@ const mysql = require("mysql");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 const cookieParser = require("cookie-parser");
+const axios = require('axios');
 require('dotenv').config();
 
 const PORT = process.env.PORT || 5001;
@@ -12,6 +13,12 @@ const PORT = process.env.PORT || 5001;
 const app = express();
 
 const JwtSecretKey = process.env.JWT_SECRET_KEY
+const cronofyClientId=process.env.DEV_CRONOFY_CLIENT_ID
+const cronofyClientSecret=process.env.DEV_CRONOFY_CLIENT_SECRET
+const cronofyScope=process.env.DEV_CRONOFY_SCOPE
+const cronofyRedirectUri=process.env.DEV_REDIRECT_URI
+const cronofyReqTokenUrl=process.env.DEV_CRONOFY_REQUEST_TOKEN_URL
+
 
 app.use(cors({
   origin: ['http://localhost:3000'],
@@ -96,6 +103,7 @@ app.post("/login", (req, res) => {
         if (resp) {
           const name = data[0].name;
           const token = jwt.sign({ name }, JwtSecretKey, { expiresIn: '1d' });
+          res.cookie('name',name);
           res.cookie('authCookie', token);
           return res.json({ status: "Success" });
         }
@@ -112,8 +120,41 @@ app.post("/login", (req, res) => {
 //user logout module
 app.get('/logout', (req, res) => {
   res.clearCookie('authCookie');
+  res.clearCookie('name');
   return res.json({ status: "Success" });
 })
+
+app.post('/redeemcode', async (req, res) => {
+  const { code } = req.body;
+  const userName = req.cookies.name;
+  // Send a POST request to Cronofy to exchange the code for tokens
+  const tokenResponse = await axios.post(`${cronofyReqTokenUrl}`, {
+    client_id: cronofyClientId,
+    client_secret: cronofyClientSecret,
+    grant_type: 'authorization_code',
+    code: code,
+    redirect_uri: cronofyRedirectUri,
+  });
+
+  const { access_token, refresh_token, sub } = tokenResponse.data;
+
+  // Save the access_token, refresh_token, and sub in your database
+  // You can use a database library or ORM for this
+  var sql = "INSERT INTO cronofytokens (`name`, `access_token`, `refresh_token`,`sub`) VALUES (?)";
+  // Make an array of values:
+  var values = [userName, access_token, refresh_token, sub];
+  // Execute the SQL statement, with the value array:
+  db.query(sql, [values], function (err, data) {
+    if (err) {
+      console.error(err); // Log the error
+      return res.json("Error DB");
+    }
+    return res.json({ status: "success" });
+  });
+
+  // Respond with a success message
+  res.json({ status: 'Success' });
+});
 
 
 app.listen(PORT, () => {
