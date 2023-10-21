@@ -19,6 +19,8 @@ const cronofyScope=process.env.DEV_CRONOFY_SCOPE
 const cronofyRedirectUri=process.env.DEV_REDIRECT_URI
 const cronofyReqTokenUrl=process.env.DEV_CRONOFY_REQUEST_TOKEN_URL
 
+// const currentTimestamp = new Date().getTime()
+const currentTimestamp = new Date();
 
 app.use(cors({
   origin: ['http://localhost:3000'],
@@ -128,37 +130,40 @@ app.post('/redeemcode', async (req, res) => {
   const { code } = req.body;
   const userName = req.cookies.name;
   // Send a POST request to Cronofy to exchange the code for tokens
-  const tokenResponse = await axios.post(`${cronofyReqTokenUrl}`, {
-    client_id: cronofyClientId,
-    client_secret: cronofyClientSecret,
-    grant_type: 'authorization_code',
-    code: code,
-    redirect_uri: cronofyRedirectUri,
-  });
-
-  const { access_token, refresh_token, sub } = tokenResponse.data;
-
-  // Save the access_token, refresh_token, and sub in your database
-  // You can use a database library or ORM for this
-  var sql = "INSERT INTO cronofytokens (`name`, `access_token`, `refresh_token`,`sub`) VALUES (?)";
-  // Make an array of values:
-  var values = [userName, access_token, refresh_token, sub];
-  // Execute the SQL statement, with the value array:
-  db.query(sql, [values], function (err, data) {
-    if (err) {
-      console.error(err); // Log the error
-      return res.json("Error DB");
-    }
-    return res.json({ status: "success" });
-  });
-
-  // Respond with a success message
-  res.json({ status: 'Success' });
+  try {
+    const tokenResponse = await axios.post(`${cronofyReqTokenUrl}`, {
+      client_id: cronofyClientId,
+      client_secret: cronofyClientSecret,
+      grant_type: 'authorization_code',
+      code: code,
+      redirect_uri: cronofyRedirectUri,
+    });
+  
+    const { access_token, refresh_token, sub } = tokenResponse.data;
+  
+    // Save the access_token, refresh_token, and sub in your database
+    // You can use a database library or ORM for this
+    var sql = "INSERT INTO cronofytokens (`name`, `access_token`, `refresh_token`,`sub`,`created_at`,`updated_at`) VALUES (?)";
+    // Make an array of values:
+    var values = [userName, access_token, refresh_token, sub,currentTimestamp,currentTimestamp];
+    // Execute the SQL statement, with the value array:
+    db.query(sql, [values], function (err, data) {
+      if (err) {
+        console.error(err); // Log the error
+        return res.json({Error:"Error DB"});
+      } else {
+        return res.json({status: "Success" });
+      }
+    });
+  } catch (err) {
+    return res.json({Error: err});
+  }
+  
 });
 
 
 app.listen(PORT, () => {
-  console.log(`Server started running on port ${PORT}`);
+  console.log(`Server started running on port ${PORT} at ${currentTimestamp}`);
   db.connect((err) => {
     if (err) throw err;
     console.log("Database Connected!");
