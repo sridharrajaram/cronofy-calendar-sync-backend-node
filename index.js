@@ -149,7 +149,7 @@ app.post('/redeemcode', async (req, res) => {
     // Execute the SQL statement, with the value array:
     db.query(sql, [values], function (err, data) {
       if (err) {
-        console.error(err); // Log the error
+        // console.error(err); // Log the error
         return res.json({Error:"Error DB"});
       } else {
         return res.json({status: "Success" });
