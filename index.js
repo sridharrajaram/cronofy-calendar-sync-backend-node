@@ -104,8 +104,10 @@ app.post("/login", (req, res) => {
         }
         if (resp) {
           const name = data[0].name;
+          const userId = data[0].id;
           const token = jwt.sign({ name }, JwtSecretKey, { expiresIn: '1d' });
           res.cookie('name', name);
+          res.cookie('userId', userId);
           res.cookie('authCookie', token);
           return res.json({ status: "Success" });
         }
@@ -123,12 +125,14 @@ app.post("/login", (req, res) => {
 app.get('/logout', (req, res) => {
   res.clearCookie('authCookie');
   res.clearCookie('name');
+  res.clearCookie('userId');
   return res.json({ status: "Success" });
 })
 
 app.post('/redeemcode', async (req, res) => {
   const { code } = req.body;
   const userName = req.cookies.name;
+  const userId = req.cookies.userId;
 
   // Send a POST request to Cronofy to exchange the code for tokens
   try {
@@ -140,34 +144,24 @@ app.post('/redeemcode', async (req, res) => {
       redirect_uri: cronofyRedirectUri,
     });
 
-    // Use a subquery to get the userId based on the username
-    const subquery = 'SELECT id FROM users WHERE name = ?';
-    db.query(subquery, [userName], (subqueryErr, subqueryResult) => {
-      if (subqueryErr) {
-        console.log(subqueryErr);
-        res.status(500).send('Error getting userId');
-        return;
+    // console.log(tokenResponse.data);
+    const { access_token, expires_in, refresh_token, sub } = tokenResponse.data;
+    const { profile_id, profile_name, provider_service } = tokenResponse.data.linking_profile;
+
+    // Save the access_token, refresh_token, and sub in your database
+    // You can use a database library or ORM for this
+    var sql = "INSERT INTO cronofytokens (`user_id`,`name`, `accessToken`, `expiresIn`, `refreshToken`, `sub`, `profileId`, `profileName`, `providerService`, `createdAt`, `updatedAt`) VALUES (?)";
+    // Make an array of values:
+    var values = [userId, userName, access_token, expires_in, refresh_token, sub, profile_id, profile_name, provider_service, currentTimestamp, currentTimestamp];
+    // Execute the SQL statement, with the value array:
+    // console.log(values);
+    db.query(sql, [values], function (err, data) {
+      if (err) {
+        // console.error(err); // Log the error
+        return res.json({ Error: "Error DB" });
+      } else {
+        return res.json({ status: "Success" });
       }
-
-      // Insert the to-do item with the retrieved userId
-      const userId = subqueryResult[0].id;
-
-      const { accessToken, expiresIn, refreshToken, sub } = tokenResponse.data;
-
-      // Save the access_token, refresh_token, and sub in your database
-      // You can use a database library or ORM for this
-      var sql = "INSERT INTO cronofytokens (`user_id`,`name`, `accessToken`, `expiresIn`, `refreshToken`,`sub`,`created_at`,`updated_at`) VALUES (?)";
-      // Make an array of values:
-      var values = [userId, userName, accessToken, expiresIn, refreshToken, sub, currentTimestamp, currentTimestamp];
-      // Execute the SQL statement, with the value array:
-      db.query(sql, [values], function (err, data) {
-        if (err) {
-          // console.error(err); // Log the error
-          return res.json({ Error: "Error DB" });
-        } else {
-          return res.json({ status: "Success" });
-        }
-      });
     });
   } catch (err) {
     return res.json({ Error: err });
@@ -178,40 +172,39 @@ app.post('/redeemcode', async (req, res) => {
 
 // API endpoint to add a to-do item for a user
 app.post('/addUserEmail', (req, res) => {
+
   const { emailAddress } = req.body;
-  const name = req.cookies.name;
+  const userName = req.cookies.name;
+  const userId = req.cookies.userId;
 
-  console.log(emailAddress,name);
-  // Use a subquery to get the userId based on the username
-  const subquery = 'SELECT id FROM users WHERE name = ?';
-  db.query(subquery, [name], (subqueryErr, subqueryResult) => {
-    if (subqueryErr) {
-      console.log(subqueryErr);
-      res.status(500).send('Error getting userId');
-      return;
+  const insertQuery = 'INSERT INTO useremails (user_id, name, personal_email) VALUES (?,?,?)';
+  db.query(insertQuery, [userId, userName, emailAddress], (err, result) => {
+    if (err) {
+      res.status(500).send('Error adding email Address item');
+    } else {
+      res.status(200).json({ status: "Success" });
     }
-
-    // Insert the to-do item with the retrieved userId
-    const userId = subqueryResult[0].id;
-    const insertQuery = 'INSERT INTO useremails (user_id, personal_email) VALUES (?, ?)';
-    db.query(insertQuery, [userId, emailAddress], (err, result) => {
-      if (err) {
-        res.status(500).send('Error adding email Address item');
-      } else {
-        res.status(200).json({ status: 'Success' });
-        const getQuery = 'SELECT personal_email FROM useremails where user_id = ?'
-        db.query(getQuery, [userId, emailAddress], (err, results) => {
-          if (err) {
-            res.status(500).send(`Error getting email Addresses of user ${name}`);
-          } else {
-            const emailList = results.map((row) => row.email);
-            res.status(200).json(emailList)
-          }
-        })
-      }
-    });
-  });
+  })
 });
+
+app.get('/getUserEmail', (req, res) => {
+
+  const userName = req.cookies.name;
+  const userId = req.cookies.userId;
+
+  const getQuery = 'SELECT personal_email FROM useremails WHERE user_id = ?'
+  db.query(getQuery, [userId], (err, results) => {
+    if (err) {
+      res.status(500).send(`Error getting email Addresses of user ${userName}`);
+    } else {
+      // console.log(results);
+      const emailList = results.map((row) => row.personal_email);
+      res.status(200).json(emailList)
+    }
+  });
+
+
+})
 
 
 
