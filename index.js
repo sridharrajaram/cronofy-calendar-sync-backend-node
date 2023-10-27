@@ -142,6 +142,7 @@ app.post('/redeemcode', async (req, res) => {
       grant_type: 'authorization_code',
       code: code,
       redirect_uri: cronofyRedirectUri,
+      avoid_link:true
     });
 
     // console.log(tokenResponse.data);
