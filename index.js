@@ -149,13 +149,11 @@ app.post('/redeemcode', async (req, res) => {
     const { access_token, expires_in, refresh_token, sub } = tokenResponse.data;
     const { profile_id, profile_name, provider_service } = tokenResponse.data.linking_profile;
 
-    // Save the access_token, refresh_token, and sub in your database
-    // You can use a database library or ORM for this
     var sql = "INSERT INTO cronofytokens (`user_id`,`name`, `accessToken`, `expiresIn`, `refreshToken`, `sub`, `profileId`, `profileName`, `providerService`, `createdAt`, `updatedAt`) VALUES (?)";
+    
     // Make an array of values:
     var values = [userId, userName, access_token, expires_in, refresh_token, sub, profile_id, profile_name, provider_service, currentTimestamp, currentTimestamp];
-    // Execute the SQL statement, with the value array:
-    // console.log(values);
+    
     db.query(sql, [values], function (err, data) {
       if (err) {
         // console.error(err); // Log the error
@@ -173,7 +171,6 @@ app.post('/redeemcode', async (req, res) => {
 
 // API endpoint to add a to-do item for a user
 app.post('/addUserEmail', (req, res) => {
-
   const { emailAddress } = req.body;
   const userName = req.cookies.name;
   const userId = req.cookies.userId;
