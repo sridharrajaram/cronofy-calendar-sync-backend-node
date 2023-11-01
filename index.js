@@ -19,7 +19,6 @@ const cronofyScope = process.env.DEV_CRONOFY_SCOPE
 const cronofyRedirectUri = process.env.DEV_REDIRECT_URI
 const cronofyReqTokenUrl = process.env.DEV_CRONOFY_REQUEST_TOKEN_URL
 
-// const currentTimestamp = new Date().getTime()
 const currentTimestamp = new Date();
 
 app.use(cors({
@@ -204,50 +203,6 @@ app.get('/getUserEmail', (req, res) => {
 
 })
 
-// app.put('/removeUserEmail', async (req, res) => {
-//   const { emailAddress } = req.body;
-//   const userId = req.cookies.userId;
-
-//   try {
-//     const [resultedData] = await db.query('SELECT refreshToken, profileId FROM cronofytokens WHERE user_id = ? AND profileName = ?', [userId, emailAddress]);
-
-//     // Send a POST request to Cronofy to refresh the access code for refresh tokens
-//     try {
-//       const newTokenResponse = await axios.post(cronofyReqTokenUrl, {
-//         client_id: cronofyClientId,
-//         client_secret: cronofyClientSecret,
-//         grant_type: 'refresh_token',
-//         refresh_token: resultedData.refreshToken // Access the correct property
-//       });
-
-//       const { access_token, expires_in, refresh_token } = newTokenResponse.data;
-//       await db.query('UPDATE cronofytokens SET accessToken = ?, expiresIn = ?, refreshToken = ? WHERE user_id = ? AND personal_email = ?', [access_token, expires_in, refresh_token, userId, emailAddress]);
-
-//       try {
-//         const revokeProfile = await axios.post(`https://app.cronofy.com/v1/profiles/${resultedData.profileId}/revoke`, null, {
-//           headers: {
-//             Authorization: `Bearer ${access_token}` // Fix the header syntax
-//           }
-//         });
-
-//         if (revokeProfile.data === 'OK') {
-//           await db.query('DELETE FROM cronofytoken WHERE user_id = ? AND profileId = ?', [userId, resultedData.profileId]);
-//           await db.query('DELETE FROM useremails WHERE user_id = ? AND personal_email = ?', [userId, emailAddress]);
-//           res.json({ status: "Success" });
-//         } else {
-//           res.json({ Error: "Error while revoking user profile" });
-//         }
-//       } catch (err) {
-//         res.json({ Error: 'Authorization error while revoking profile' });
-//       }
-//     } catch (err) {
-//       res.json({ Error: "Error in getting new access token" });
-//     }
-//   } catch (err) {
-//     res.status(500).send('Error in fetching email Address item');
-//   }
-// });
-
 app.post('/removeUserEmail', async (req, res) => {
   const { emailAddress } = req.body;
   const userId = req.cookies.userId;
@@ -257,8 +212,6 @@ app.post('/removeUserEmail', async (req, res) => {
     if (err) {
       res.status(500).send('Error in fetching email Address item');
     } else {
-      // console.log(resultedData[0].refreshToken)
-      // console.log(resultedData[0].profileId)
       // Send a POST request to Cronofy to refresh the access code for refresh tokens
       try {
         const newTokenResponse = await axios.post(`${cronofyReqTokenUrl}`, {
@@ -267,21 +220,15 @@ app.post('/removeUserEmail', async (req, res) => {
           grant_type: 'refresh_token',
           refresh_token: resultedData[0].refreshToken
         });
-        // console.log(newTokenResponse.data)
+        
         const { access_token, expires_in, refresh_token } = newTokenResponse.data;
-        // console.log(access_token)
-        // console.log(expires_in)
-        // console.log(refresh_token)
         const updateQuery = 'UPDATE cronofytokens SET accessToken = ?, expiresIn = ?, refreshToken = ?, updatedAt = ? WHERE user_id = ? AND profileName = ?'
         db.query(updateQuery, [access_token, expires_in, refresh_token, currentTimestamp, userId, emailAddress], async function (err, data) {
           if (err) {
-            // console.log('updateQuery',updateQuery);
             // console.error(err); // Log the error
             return res.json({ Error: "Error in updating new token in DB" });
           } else {
             try {
-              // console.log(data);
-              // console.log(resultedData[0].profileId)
               const revokeProfile = await axios.post(`https://api.cronofy.com/v1/profiles/${resultedData[0].profileId}/revoke`, null, {
                 headers: {
                   Authorization: `Bearer ${access_token}` // Fix the header syntax
@@ -322,8 +269,6 @@ app.post('/removeUserEmail', async (req, res) => {
     }
   })
 })
-
-
 
 app.listen(PORT, () => {
   console.log(`Server started running on port ${PORT} at ${currentTimestamp}`);
